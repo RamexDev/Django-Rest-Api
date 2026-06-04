@@ -1,7 +1,7 @@
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
 
-from .filters import ProductFilter
+from .filters import InStockFilterBackend, ProductFilter
 from .models import Product, Order
 from .serializers import OrderSerializer, ProductInfoSerializer, ProductSerializer
 from rest_framework.response import Response
@@ -9,6 +9,8 @@ from rest_framework.decorators import api_view
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from rest_framework.views import APIView
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
 
 
 # Create your views here.
@@ -29,6 +31,9 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     filterset_class = ProductFilter
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter, InStockFilterBackend]
+    search_fields = ['=name', 'description']
+    ordering_fields = ['name', 'price', 'stock']
 
     def get_permissions(self):
         self.permission_classes = [AllowAny]
