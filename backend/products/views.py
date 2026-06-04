@@ -1,17 +1,18 @@
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
-
-from .filters import InStockFilterBackend, ProductFilter
-from .models import Product, Order
-from .serializers import OrderSerializer, ProductInfoSerializer, ProductSerializer
-from rest_framework.response import Response
-from rest_framework.decorators import api_view
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
-from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters
+from rest_framework import filters, generics, viewsets
+from rest_framework.decorators import api_view, action
+from rest_framework.pagination import (CursorPagination, LimitOffsetPagination,
+                                       PageNumberPagination)
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from .filters import InStockFilterBackend, OrderFilter, ProductFilter
+from .models import Order, Product
+from .serializers import (OrderSerializer, OrderCreateSerializer, ProductInfoSerializer,
+                          ProductSerializer)
 
 # Create your views here.
 
@@ -28,12 +29,17 @@ from rest_framework import filters
 #     model = Product
 #     serializer_class = ProductSerializer
 class ProductListCreateAPIView(generics.ListCreateAPIView):
-    queryset = Product.objects.all()
+    queryset = Product.objects.order_by('pk')
     serializer_class = ProductSerializer
     filterset_class = ProductFilter
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter, InStockFilterBackend]
     search_fields = ['=name', 'description']
     ordering_fields = ['name', 'price', 'stock']
+    pagination_class = PageNumberPagination
+    pagination_class.page_size = 2
+    pagination_class.page_query_param = 'page'
+    pagination_class.page_size_query_param = 'page_size'
+    pagination_class.max_page_size = 6
 
     def get_permissions(self):
         self.permission_classes = [AllowAny]
@@ -65,18 +71,47 @@ class ProductDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 #     orders = Order.objects.prefetch_related('items__product')
 #     serializer = OrderSerializer(orders, many=True)
 #     return Response(serializer.data)
-class OrderListAPIView(generics.ListAPIView):
-    queryset = Order.objects.prefetch_related('items__product')
-    serializer_class = OrderSerializer
+# class OrderListAPIView(generics.ListAPIView):
+#     queryset = Order.objects.prefetch_related('items__product')
+#     serializer_class = OrderSerializer
 
-class UserOrderListAPIView(generics.ListAPIView):
+# class UserOrderListAPIView(generics.ListAPIView):
+#     queryset = Order.objects.prefetch_related('items__product')
+#     serializer_class = OrderSerializer
+#     permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         qs = super().get_queryset()
+#         return qs.filter(user = self.request.user)
+class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.prefetch_related('items__product')
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
+    filterset_class = OrderFilter
+    filter_backends = [DjangoFilterBackend]
 
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def get_serializer_class(self):
+        # can also check self.request.method
+        if self.action in ['create', 'update']:
+            return OrderCreateSerializer
+        return super().get_serializer_class()
+
+    # @action(detail=False, methods=['get'], url_path='user-orders')
+    # def user_orders(self, request):
+    #     orders = self.get_queryset().filter(user=request.user)
+    #     serializer = self.get_serializer(orders, many=True)
+    #     return Response(serializer.data)
     def get_queryset(self):
         qs = super().get_queryset()
-        return qs.filter(user = self.request.user)
+        if not self.request.user.is_staff:
+            qs = qs.filter(user=self.request.user)
+        return qs
+
+
 
 
 # @api_view(['GET'])

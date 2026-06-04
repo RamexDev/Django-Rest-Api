@@ -23,6 +23,15 @@ Content-Type: application/json
 }
 
 ###
+POST http://localhost:8000/api/token/ HTTP/1.1
+Content-Type: application/json
+
+{
+    "username": "admin",
+    "password": "test"
+}
+
+###
 GET http://localhost:8000/api/user-orders/ HTTP/1.1
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgwMzk1Njk4LCJpYXQiOjE3ODAzOTUzOTgsImp0aSI6IjAxOGNkODcwMGQ5NDRjM2Y5MGM2Y2ExYWU4NTg1YzY0IiwidXNlcl9pZCI6IjIifQ.G9hTxW_8QlbEOhO1zO8kdbVsSf2lr85pSb97zrJasuc
 
@@ -52,3 +61,33 @@ Content-Type: application/json
 
 ###
 DELETE http://localhost:8000/api/products/2/ HTTP/1.1
+
+###
+GET http://localhost:8000/api/orders/ HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgwNTg5MTAwLCJpYXQiOjE3ODA1ODg4MDAsImp0aSI6IjIxYjE5NjQxMTUyNzQ3NzM4Y2I0NDZlM2Y0ZDg1MjBhIiwidXNlcl9pZCI6IjEifQ.GZqGFssKkwx2s6GbnXJ2IExaFGzJ3rpYwgOpHGDaIXU
+
+###
+GET http://localhost:8000/api/orders/e79f817f-56de-4e91-a42c-18a1d821a4b8 HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgwNTg5MjMyLCJpYXQiOjE3ODA1ODg5MzIsImp0aSI6Ijg1MjhmMDdlZTE4ZTRiOTRiMGJhOTRhM2NjNzMyYTA2IiwidXNlcl9pZCI6IjIifQ.rLCKoFPEZpSvlSv3VA6zeRq3iowjIQ3h9RUITjd9cFY
+
+
+###
+POST http://localhost:8000/api/orders/ HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgwNTkyMjQyLCJpYXQiOjE3ODA1OTE5NDIsImp0aSI6IjFiNjU0ZTcwNmY2ZjRkYjE4ZjAzMWM3MDZiMDJiMzdjIiwidXNlcl9pZCI6IjEifQ.GdYx4v9rbVYO6smhxMCclCuUcraUCBb1Hx17C2s6a2I
+Content-Type: application/json
+
+{
+    "status": "Pending",
+    "items": [
+        {
+            "product": 2,
+            "quantity": 2
+        },
+        {
+            "product": 2,
+            "quantity": 1
+        }
+    ]
+}
+
+
