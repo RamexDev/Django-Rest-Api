@@ -1,6 +1,9 @@
 from django.db.models import Max
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_headers
+from django.utils.decorators import method_decorator
 from rest_framework import filters, generics, viewsets
 from rest_framework.decorators import api_view, action
 from rest_framework.pagination import (CursorPagination, LimitOffsetPagination,
@@ -10,9 +13,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .filters import InStockFilterBackend, OrderFilter, ProductFilter
-from .models import Order, Product
+from .models import Order, Product, User
 from .serializers import (OrderSerializer, OrderCreateSerializer, ProductInfoSerializer,
-                          ProductSerializer)
+                          ProductSerializer, UserSerializer)
+
+from rest_framework.throttling import ScopedRateThrottle
+from .tasks import send_order_confirmation_email
+
+
 
 # Create your views here.
 
@@ -29,6 +37,8 @@ from .serializers import (OrderSerializer, OrderCreateSerializer, ProductInfoSer
 #     model = Product
 #     serializer_class = ProductSerializer
 class ProductListCreateAPIView(generics.ListCreateAPIView):
+    throttle_scope = 'product'
+    throttle_classes = [ScopedRateThrottle]
     queryset = Product.objects.order_by('pk')
     serializer_class = ProductSerializer
     filterset_class = ProductFilter
@@ -36,10 +46,19 @@ class ProductListCreateAPIView(generics.ListCreateAPIView):
     search_fields = ['=name', 'description']
     ordering_fields = ['name', 'price', 'stock']
     pagination_class = PageNumberPagination
-    pagination_class.page_size = 2
+    pagination_class.page_size = 5
     pagination_class.page_query_param = 'page'
     pagination_class.page_size_query_param = 'page_size'
-    pagination_class.max_page_size = 6
+    pagination_class.max_page_size = 10
+
+    @method_decorator(cache_page(60 * 15, key_prefix='product_list'))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    # def get_queryset(self):
+    #     import time
+    #     time.sleep(2)
+    #     return super().get_queryset()
 
     def get_permissions(self):
         self.permission_classes = [AllowAny]
@@ -84,6 +103,8 @@ class ProductDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 #         qs = super().get_queryset()
 #         return qs.filter(user = self.request.user)
 class OrderViewSet(viewsets.ModelViewSet):
+    throttle_scope = 'orders'
+    throttle_classes = [ScopedRateThrottle]
     queryset = Order.objects.prefetch_related('items__product')
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
@@ -91,8 +112,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     filterset_class = OrderFilter
     filter_backends = [DjangoFilterBackend]
 
+    @method_decorator(cache_page(60 * 15, key_prefix='order_list'))
+    @method_decorator(vary_on_headers('Authorization'))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        order = serializer.save(user=self.request.user)
+        send_order_confirmation_email.delay(order.order_id, self.request.user.email)
 
     def get_serializer_class(self):
         # can also check self.request.method
@@ -132,3 +159,9 @@ class ProductInfoAPIView(APIView):
             'max_price': products.aggregate(max_price=Max('price'))['max_price']
             })
         return Response(serializer.data)
+    
+
+
+class UserListView(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
